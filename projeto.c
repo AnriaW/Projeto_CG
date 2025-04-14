@@ -17,20 +17,21 @@
 #define BALL_SPEED 5
 
 // Dimensões do gol
-#define GOAL_WIDTH 100
-#define GOAL_HEIGHT 50
+#define GOAL_WIDTH 30
+#define GOAL_HEIGHT 100
 
 // Variáveis globais
 float ball_x = WINDOW_WIDTH / 2;
 float ball_y = WINDOW_HEIGHT / 2;
 int score_left = 0;
 int score_right = 0;
-bool key_states[256];
+bool special_keys[4] = {false, false, false, false}; // UP, DOWN, LEFT, RIGHT
 
 // Estrutura para representar um jogador
 typedef struct {
     float x, y;
     int team; // 0 = time da esquerda, 1 = time da direita
+    int radius; // Raio para detecção de colisão
 } Player;
 
 // Array de jogadores (5 para cada time)
@@ -103,6 +104,7 @@ void initializePlayers() {
         players[i].team = 0;
         players[i].x = WINDOW_WIDTH / 4 + (rand() % 100 - 50);
         players[i].y = WINDOW_HEIGHT / 2 + (i - NUM_PLAYERS_PER_TEAM / 2) * 80;
+        players[i].radius = 20; // Raio para colisão
     }
     
     // Time da direita
@@ -110,10 +112,11 @@ void initializePlayers() {
         players[i + NUM_PLAYERS_PER_TEAM].team = 1;
         players[i + NUM_PLAYERS_PER_TEAM].x = 3 * WINDOW_WIDTH / 4 + (rand() % 100 - 50);
         players[i + NUM_PLAYERS_PER_TEAM].y = WINDOW_HEIGHT / 2 + (i - NUM_PLAYERS_PER_TEAM / 2) * 80;
+        players[i + NUM_PLAYERS_PER_TEAM].radius = 20; // Raio para colisão
     }
 }
 
-// Função para desenhar um jogador
+// Função para desenhar um jogador (agora orientado corretamente)
 void drawPlayer(Player player) {
     glPushMatrix();
     glTranslatef(player.x, player.y, 0);
@@ -126,18 +129,18 @@ void drawPlayer(Player player) {
     }
     
     // Cabeça
-    bresenhamCircle(0, 15, 10);
+    bresenhamCircle(0, -15, 10);
     
     // Corpo
-    bresenhamLine(0, 5, 0, -20);
+    bresenhamLine(0, -5, 0, 20);
     
     // Braços
-    bresenhamLine(0, 0, -15, -5);
-    bresenhamLine(0, 0, 15, -5);
+    bresenhamLine(0, 0, -15, 5);
+    bresenhamLine(0, 0, 15, 5);
     
     // Pernas
-    bresenhamLine(0, -20, -10, -40);
-    bresenhamLine(0, -20, 10, -40);
+    bresenhamLine(0, 20, -10, 40);
+    bresenhamLine(0, 20, 10, 40);
     
     glPopMatrix();
 }
@@ -171,43 +174,60 @@ void drawField() {
     
     // Círculo central
     bresenhamCircle(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, 50);
+
+    // Grande área do gol esquerdo
+    int large_area_width = 100;
+    int large_area_height = 200;
+    bresenhamLine(field_x, field_y + (FIELD_HEIGHT - large_area_height)/2, 
+                 field_x + large_area_width, field_y + (FIELD_HEIGHT - large_area_height)/2);
+    bresenhamLine(field_x + large_area_width, field_y + (FIELD_HEIGHT - large_area_height)/2, 
+                 field_x + large_area_width, field_y + (FIELD_HEIGHT + large_area_height)/2);
+    bresenhamLine(field_x + large_area_width, field_y + (FIELD_HEIGHT + large_area_height)/2, 
+                 field_x, field_y + (FIELD_HEIGHT + large_area_height)/2);
     
-    // Áreas dos gols
-    
-    // Área do gol esquerdo
-    bresenhamLine(field_x, field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT, 
-                 field_x + GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT);
-    bresenhamLine(field_x + GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT, 
-                 field_x + GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT);
-    bresenhamLine(field_x + GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT, 
-                 field_x, field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT);
-    
-    // Área do gol direito
-    bresenhamLine(field_x + FIELD_WIDTH, field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT, 
-                 field_x + FIELD_WIDTH - GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT);
-    bresenhamLine(field_x + FIELD_WIDTH - GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT, 
-                 field_x + FIELD_WIDTH - GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT);
-    bresenhamLine(field_x + FIELD_WIDTH - GOAL_WIDTH, field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT, 
-                 field_x + FIELD_WIDTH, field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT);
+    // Grande área do gol direito
+    bresenhamLine(field_x + FIELD_WIDTH, field_y + (FIELD_HEIGHT - large_area_height)/2, 
+                 field_x + FIELD_WIDTH - large_area_width, field_y + (FIELD_HEIGHT - large_area_height)/2);
+    bresenhamLine(field_x + FIELD_WIDTH - large_area_width, field_y + (FIELD_HEIGHT - large_area_height)/2, 
+                 field_x + FIELD_WIDTH - large_area_width, field_y + (FIELD_HEIGHT + large_area_height)/2);
+    bresenhamLine(field_x + FIELD_WIDTH - large_area_width, field_y + (FIELD_HEIGHT + large_area_height)/2, 
+                 field_x + FIELD_WIDTH, field_y + (FIELD_HEIGHT + large_area_height)/2);
                  
     // Pequena área do gol esquerdo
-    int small_area_width = GOAL_WIDTH / 2;
-    int small_area_height = GOAL_HEIGHT / 2;
-    bresenhamLine(field_x, field_y + FIELD_HEIGHT / 2 - small_area_height, 
-                 field_x + small_area_width, field_y + FIELD_HEIGHT / 2 - small_area_height);
-    bresenhamLine(field_x + small_area_width, field_y + FIELD_HEIGHT / 2 - small_area_height, 
-                 field_x + small_area_width, field_y + FIELD_HEIGHT / 2 + small_area_height);
-    bresenhamLine(field_x + small_area_width, field_y + FIELD_HEIGHT / 2 + small_area_height, 
-                 field_x, field_y + FIELD_HEIGHT / 2 + small_area_height);
+    int small_area_width = 50;
+    int small_area_height = 120;
+    bresenhamLine(field_x, field_y + (FIELD_HEIGHT - small_area_height)/2, 
+                 field_x + small_area_width, field_y + (FIELD_HEIGHT - small_area_height)/2);
+    bresenhamLine(field_x + small_area_width, field_y + (FIELD_HEIGHT - small_area_height)/2, 
+                 field_x + small_area_width, field_y + (FIELD_HEIGHT + small_area_height)/2);
+    bresenhamLine(field_x + small_area_width, field_y + (FIELD_HEIGHT + small_area_height)/2, 
+                 field_x, field_y + (FIELD_HEIGHT + small_area_height)/2);
                  
     // Pequena área do gol direito
-    bresenhamLine(field_x + FIELD_WIDTH, field_y + FIELD_HEIGHT / 2 - small_area_height, 
-                 field_x + FIELD_WIDTH - small_area_width, field_y + FIELD_HEIGHT / 2 - small_area_height);
-    bresenhamLine(field_x + FIELD_WIDTH - small_area_width, field_y + FIELD_HEIGHT / 2 - small_area_height, 
-                 field_x + FIELD_WIDTH - small_area_width, field_y + FIELD_HEIGHT / 2 + small_area_height);
-    bresenhamLine(field_x + FIELD_WIDTH - small_area_width, field_y + FIELD_HEIGHT / 2 + small_area_height, 
-                 field_x + FIELD_WIDTH, field_y + FIELD_HEIGHT / 2 + small_area_height);
+    bresenhamLine(field_x + FIELD_WIDTH, field_y + (FIELD_HEIGHT - small_area_height)/2, 
+                 field_x + FIELD_WIDTH - small_area_width, field_y + (FIELD_HEIGHT - small_area_height)/2);
+    bresenhamLine(field_x + FIELD_WIDTH - small_area_width, field_y + (FIELD_HEIGHT - small_area_height)/2, 
+                 field_x + FIELD_WIDTH - small_area_width, field_y + (FIELD_HEIGHT + small_area_height)/2);
+    bresenhamLine(field_x + FIELD_WIDTH - small_area_width, field_y + (FIELD_HEIGHT + small_area_height)/2, 
+                 field_x + FIELD_WIDTH, field_y + (FIELD_HEIGHT + small_area_height)/2);
+
+    // Gol esquerdo (fora do campo e centralizado)
+    bresenhamLine(field_x, field_y + FIELD_HEIGHT/2 - GOAL_HEIGHT/2, 
+                 field_x - GOAL_WIDTH, field_y + FIELD_HEIGHT/2 - GOAL_HEIGHT/2);
+    bresenhamLine(field_x - GOAL_WIDTH, field_y + FIELD_HEIGHT/2 - GOAL_HEIGHT/2, 
+                 field_x - GOAL_WIDTH, field_y + FIELD_HEIGHT/2 + GOAL_HEIGHT/2);
+    bresenhamLine(field_x - GOAL_WIDTH, field_y + FIELD_HEIGHT/2 + GOAL_HEIGHT/2, 
+                 field_x, field_y + FIELD_HEIGHT/2 + GOAL_HEIGHT/2);
+
+    // Gol direito (fora do campo e centralizado)
+    bresenhamLine(field_x + FIELD_WIDTH, field_y + FIELD_HEIGHT/2 - GOAL_HEIGHT/2, 
+                 field_x + FIELD_WIDTH + GOAL_WIDTH, field_y + FIELD_HEIGHT/2 - GOAL_HEIGHT/2);
+    bresenhamLine(field_x + FIELD_WIDTH + GOAL_WIDTH, field_y + FIELD_HEIGHT/2 - GOAL_HEIGHT/2, 
+                 field_x + FIELD_WIDTH + GOAL_WIDTH, field_y + FIELD_HEIGHT/2 + GOAL_HEIGHT/2);
+    bresenhamLine(field_x + FIELD_WIDTH + GOAL_WIDTH, field_y + FIELD_HEIGHT/2 + GOAL_HEIGHT/2, 
+                 field_x + FIELD_WIDTH, field_y + FIELD_HEIGHT/2 + GOAL_HEIGHT/2);
     
+    // Cantos do campo
     // Canto superior esquerdo
     bresenhamCircle(field_x, field_y, 10);
     
@@ -256,8 +276,9 @@ void checkGoal() {
     
     // Verifica gol no lado direito
     if (ball_x > field_x + FIELD_WIDTH && 
-        ball_y > field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT && 
-        ball_y < field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT) {
+        ball_y > field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT/2 && 
+        ball_y < field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT/2 &&
+        ball_x < field_x + FIELD_WIDTH + GOAL_WIDTH) {
         score_left++;
         // Reinicia a bola no centro
         ball_x = WINDOW_WIDTH / 2;
@@ -266,13 +287,41 @@ void checkGoal() {
     
     // Verifica gol no lado esquerdo
     if (ball_x < field_x && 
-        ball_y > field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT && 
-        ball_y < field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT) {
+        ball_y > field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT/2 && 
+        ball_y < field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT/2 &&
+        ball_x > field_x - GOAL_WIDTH) {
         score_right++;
         // Reinicia a bola no centro
         ball_x = WINDOW_WIDTH / 2;
         ball_y = WINDOW_HEIGHT / 2;
     }
+}
+
+// Função para verificar colisão entre a bola e um jogador
+bool checkPlayerCollision(Player player, float new_ball_x, float new_ball_y) {
+    // Calcula a distância entre o centro da bola e o centro do jogador
+    float dx = new_ball_x - player.x;
+    float dy = new_ball_y - player.y;
+    float distance = sqrt(dx * dx + dy * dy);
+    
+    // Verifica se a distância é menor que a soma dos raios (colisão)
+    return distance < (BALL_RADIUS + player.radius);
+}
+
+// Função para calcular a nova direção da bola após colisão com um jogador
+void resolveCollision(Player player, float *dx, float *dy) {
+    // Vetor da bola para o jogador
+    float vx = player.x - ball_x;
+    float vy = player.y - ball_y;
+    
+    // Normaliza o vetor
+    float length = sqrt(vx * vx + vy * vy);
+    vx /= length;
+    vy /= length;
+    
+    // Inverte a direção da bola e aplica um pequeno impulso
+    *dx = -vx * BALL_SPEED * 1.5;
+    *dy = -vy * BALL_SPEED * 1.5;
 }
 
 // Função para atualizar o jogo
@@ -281,29 +330,57 @@ void update() {
     int field_y = (WINDOW_HEIGHT - FIELD_HEIGHT) / 2;
     
     // Movimento da bola baseado nas teclas pressionadas
-    if (key_states['w'] || key_states['W']) {
-        ball_y -= BALL_SPEED;
+    float dx = 0, dy = 0;
+    
+    if (special_keys[0]) { // UP
+        dy = -BALL_SPEED;
     }
-    if (key_states['s'] || key_states['S']) {
-        ball_y += BALL_SPEED;
+    if (special_keys[1]) { // DOWN
+        dy = BALL_SPEED;
     }
-    if (key_states['a'] || key_states['A']) {
-        ball_x -= BALL_SPEED;
+    if (special_keys[2]) { // LEFT
+        dx = -BALL_SPEED;
     }
-    if (key_states['d'] || key_states['D']) {
-        ball_x += BALL_SPEED;
+    if (special_keys[3]) { // RIGHT
+        dx = BALL_SPEED;
+    }
+    
+    // Novas coordenadas da bola
+    float new_ball_x = ball_x + dx;
+    float new_ball_y = ball_y + dy;
+    
+    // Verifica colisão com jogadores
+    bool collision = false;
+    for (int i = 0; i < NUM_PLAYERS_PER_TEAM * 2; i++) {
+        if (checkPlayerCollision(players[i], new_ball_x, new_ball_y)) {
+            collision = true;
+            resolveCollision(players[i], &dx, &dy);
+            new_ball_x = ball_x + dx;
+            new_ball_y = ball_y + dy;
+            break;
+        }
+    }
+    
+    // Atualiza a posição da bola se não houver colisão
+    if (!collision) {
+        ball_x = new_ball_x;
+        ball_y = new_ball_y;
+    } else {
+        // Se houver colisão, aplica o impulso calculado em resolveCollision
+        ball_x += dx;
+        ball_y += dy;
     }
     
     // Verificação de colisão com as bordas do campo, exceto na área dos gols
-    if ((ball_x < field_x && (ball_y < field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT || 
-                              ball_y > field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT)) || 
-        ball_x < field_x - BALL_RADIUS) {
+    if ((ball_x < field_x && (ball_y < field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT/2 || 
+                              ball_y > field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT/2)) || 
+        ball_x < field_x - GOAL_WIDTH - BALL_RADIUS) {
         ball_x = field_x + BALL_RADIUS;
     }
     
-    if ((ball_x > field_x + FIELD_WIDTH && (ball_y < field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT || 
-                                           ball_y > field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT)) || 
-        ball_x > field_x + FIELD_WIDTH + BALL_RADIUS) {
+    if ((ball_x > field_x + FIELD_WIDTH && (ball_y < field_y + FIELD_HEIGHT / 2 - GOAL_HEIGHT/2 || 
+                                           ball_y > field_y + FIELD_HEIGHT / 2 + GOAL_HEIGHT/2)) || 
+        ball_x > field_x + FIELD_WIDTH + GOAL_WIDTH + BALL_RADIUS) {
         ball_x = field_x + FIELD_WIDTH - BALL_RADIUS;
     }
     
@@ -354,12 +431,38 @@ void timer(int value) {
     glutTimerFunc(16, timer, 0); // Aproximadamente 60 FPS
 }
 
-void keyboard(unsigned char key, int x, int y) {
-    key_states[key] = true;
+void specialKeyDown(int key, int x, int y) {
+    switch (key) {
+        case GLUT_KEY_UP:
+            special_keys[0] = true;
+            break;
+        case GLUT_KEY_DOWN:
+            special_keys[1] = true;
+            break;
+        case GLUT_KEY_LEFT:
+            special_keys[2] = true;
+            break;
+        case GLUT_KEY_RIGHT:
+            special_keys[3] = true;
+            break;
+    }
 }
 
-void keyboardUp(unsigned char key, int x, int y) {
-    key_states[key] = false;
+void specialKeyUp(int key, int x, int y) {
+    switch (key) {
+        case GLUT_KEY_UP:
+            special_keys[0] = false;
+            break;
+        case GLUT_KEY_DOWN:
+            special_keys[1] = false;
+            break;
+        case GLUT_KEY_LEFT:
+            special_keys[2] = false;
+            break;
+        case GLUT_KEY_RIGHT:
+            special_keys[3] = false;
+            break;
+    }
 }
 
 // Função principal
@@ -373,8 +476,8 @@ int main(int argc, char** argv) {
     // Configuração inicial
     glClearColor(0.0, 0.3, 0.0, 1.0);
     
-    // Inicializa os estados do teclado
-    memset(key_states, 0, sizeof(key_states));
+    // Inicializa os estados das teclas especiais
+    memset(special_keys, 0, sizeof(special_keys));
     
     // Inicializa os jogadores
     initializePlayers();
@@ -383,8 +486,8 @@ int main(int argc, char** argv) {
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutTimerFunc(0, timer, 0);
-    glutKeyboardFunc(keyboard);
-    glutKeyboardUpFunc(keyboardUp);
+    glutSpecialFunc(specialKeyDown);
+    glutSpecialUpFunc(specialKeyUp);
     
     // Inicia o loop principal
     glutMainLoop();
