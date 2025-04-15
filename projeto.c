@@ -503,8 +503,8 @@ void update() {
                 collision = true;
                 resolveCollision(goalkeepers[i].x, goalkeepers[i].y, &dx, &dy);
                 // Goleiros dão um impulso maior na bola
-                dx *= 1.3;
-                dy *= 1.3;
+                dx *= 3;
+                dy *= 3;
                 new_ball_x = ball_x + dx;
                 new_ball_y = ball_y + dy;
                 break;
@@ -636,7 +636,6 @@ int main(int argc, char** argv) {
     // Inicializa os jogadores
     initializePlayers();
 
-    
     // Registra callbacks
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
